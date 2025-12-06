@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Planora</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root { --primary: #4f46e5; --bg: white; --text: #1f2937; --card: #f9fafb; --border: #e5e7eb; }
+  .dark { --primary: #818cf8; --bg: #1f2937; --text: #f9fafb; --card: #374151; --border: #4b5563; }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: sans-serif; }
+  body { background: var(--bg); color: var(--text); padding: 20px; transition: 0.3s; }
+  .container { max-width: 800px; margin: auto; background: var(--bg); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden; }
+  .header { background: linear-gradient(90deg, var(--primary), #7c3aed); color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .logo { font-size: 24px; font-weight: bold; display: flex; align-items: center; gap: 10px; }
+  .controls { display: flex; gap: 10px; }
+  .btn { padding: 8px 16px; background: rgba(255,255,255,0.2); border: none; border-radius: 8px; color: white; cursor: pointer; }
+  .page { display: none; padding: 30px; }
+  .active { display: block; }
+  .login-options, .form-container { max-width: 400px; margin: 40px auto; }
+  .option { padding: 15px; border: 2px solid var(--border); border-radius: 12px; margin: 10px 0; cursor: pointer; display: flex; align-items: center; gap: 15px; user-select:none; }
+  .selected { border-color: var(--primary); background: var(--card); }
+  .primary-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; }
+  input, select { width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); margin: 10px 0; }
+  .duration-box { background: var(--card); padding: 20px; border-radius: 12px; margin: 20px 0; }
+  .duration-controls { display: flex; align-items: center; gap: 15px; margin: 15px 0; }
+  .arrow { width: 40px; height: 40px; border-radius: 50%; background: var(--bg); border: 2px solid var(--border); cursor: pointer; font-size: 20px; user-select:none; }
+  .duration-value { font-size: 24px; font-weight: bold; color: var(--primary); }
+  .interests { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+  .interest { padding: 10px 20px; border: 2px solid var(--border); border-radius: 25px; cursor: pointer; user-select:none; }
+  .selected-interest { background: var(--primary); color: white; border-color: var(--primary); }
+  .itinerary { background: var(--card); padding: 20px; border-radius: 12px; margin-top: 20px; }
+  .hidden { display: none; }
+  .lang-ar { direction: rtl; text-align: right; }
+  .time-slot { display: flex; margin: 15px 0; padding: 15px; background: var(--bg); border-radius: 10px; border-left: 4px solid var(--primary); }
+  .time-label { min-width: 100px; font-weight: bold; color: var(--primary); }
+  .activity-details { flex: 1; }
+  .activity-type { font-size: 0.9em; color: #6b7280; margin-bottom: 5px; }
+  .activity-name { font-weight: 500; }
+  .time-selection { display: flex; gap: 10px; margin: 15px 0; }
+  .time-input { width: 120px; }
+  .section-title { margin-top: 25px; margin-bottom: 15px; color: var(--primary); font-weight: bold; }
+  .pdf-btn { background: #10b981 !important; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div class="logo">✈️ Planora</div>
+    <div class="controls">
+      <button class="btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
+      <button class="btn" onclick="toggleLang()" id="langBtn">🌐</button>
+      <button class="btn pdf-btn hidden" onclick="exportToPDF()" id="pdfBtn">📄 PDF</button>
+      <button class="btn hidden" onclick="logout()" id="logoutBtn">🚪</button>
+    </div>
+  </div>
+
+  <!-- PAGE 1 -->
+  <div class="page active" id="page1">
+    <h2 id="welcome">Welcome to Planora</h2>
+    <p id="subtitle">Plan your perfect journey</p>
+    <div class="login-options">
+      <div class="option" onclick="selectOption(0)">G <span id="opt1">Continue with Gmail</span></div>
+      <div class="option selected" onclick="selectOption(1)"> <span id="opt2">Continue with Apple ID</span></div>
+      <div class="option" onclick="selectOption(2)">✉️ <span id="opt3">Continue with Email</span></div>
+      <div style="text-align:center; margin:20px 0;">or</div>
+      <button class="primary-btn" onclick="loginAsGuest()" id="guestBtn">Continue as Guest</button>
+      <button class="primary-btn" onclick="continueLogin()" id="continueBtn">Continue</button>
+    </div>
+  </div>
+
+  <!-- PAGE 2 -->
+  <div class="page" id="page2">
+    <h2 id="signinTitle">Sign in with your email</h2>
+    <div class="form-container">
+      <input type="email" id="emailInput" placeholder="you@example.com" value="user@example.com" />
+      <input type="password" id="passwordInput" placeholder="password" value="password123" />
+      <button class="primary-btn" onclick="signIn()" id="signinBtn">Sign In</button>
+      <button class="primary-btn" onclick="goBack()" style="background:var(--border);color:var(--text);">Back</button>
+    </div>
+  </div>
+
+  <!-- PAGE 3 -->
+  <div class="page" id="page3">
+    <h2 id="planTitle">Plan Your Trip</h2>
+    <input type="text" id="destinationInput" placeholder="Search destinations..." oninput="searchDestinations()" value="Riyadh, Saudi Arabia" autocomplete="off" />
+    <div id="searchResults" class="hidden"></div>
+
+    <div class="duration-box">
+      <div style="display:flex;justify-content:space-between;">
+        <div id="durationLabel">Trip Duration</div>
+        <div class="duration-value"><span id="days">3</span> days</div>
+      </div>
+      <div class="duration-controls">
+        <button class="arrow" onclick="changeDays(-1)">←</button>
+        <input type="range" min="1" max="10" value="3" style="flex:1;" oninput="updateDays()" id="daySlider" />
+        <button class="arrow" onclick="changeDays(1)">→</button>
+      </div>
+    </div>
+
+    <div class="section-title" id="timeSettingsTitle">Time Settings</div>
+    <div style="background: var(--card); padding: 15px; border-radius: 10px;">
+      <div style="margin-bottom: 10px;"><strong>Select your preferred daily schedule:</strong></div>
+      <div class="time-selection">
+        <div>
+          <label>Start Time</label>
+          <select id="startTime" class="time-input">
+            <option value="8:00">8:00 AM</option>
+            <option value="9:00" selected>9:00 AM</option>
+            <option value="10:00">10:00 AM</option>
+          </select>
+        </div>
+        <div>
+          <label>Breakfast Time</label>
+          <select id="breakfastTime" class="time-input">
+            <option value="8:30">8:30 AM</option>
+            <option value="9:00">9:00 AM</option>
+            <option value="9:30" selected>9:30 AM</option>
+          </select>
+        </div>
+        <div>
+          <label>Lunch Time</label>
+          <select id="lunchTime" class="time-input">
+            <option value="13:00">1:00 PM</option>
+            <option value="13:30" selected>1:30 PM</option>
+            <option value="14:00">2:00 PM</option>
+          </select>
+        </div>
+        <div>
+          <label>Dinner Time</label>
+          <select id="dinnerTime" class="time-input">
+            <option value="19:00">7:00 PM</option>
+            <option value="20:00" selected>8:00 PM</option>
+            <option value="20:30">8:30 PM</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title" id="interestsLabel">Select Your Interests</div>
+    <div class="interests" id="interests"></div>
+
+    <button class="primary-btn" onclick="generateItinerary()" id="generateBtn">Generate Itinerary</button>
+
+    <div class="itinerary" id="itinerary">
+      <div style="text-align:center;padding:40px 0;">🗺️<br>
+        <p id="noItinerary">Select destination and interests to generate itinerary</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const HF_API = "";
+
+let state = {
+  page: 1,
+  dark: false,
+  lang: 'en',
+  logged: false,
+  dest: 'Riyadh, Saudi Arabia',
+  days: 3,
+  startTime: '9:00',
+  breakfastTime: '9:30',
+  lunchTime: '13:30',
+  dinnerTime: '20:00',
+  interests: ['cultural', 'food', 'shopping'],
+  currentItinerary: null,
+  usedActivities: []
+};
+
+const activityTypes = {
+  food: 'Food & Dining',
+  shopping: 'Shopping & Markets',
+  cultural: 'Cultural Sites',
+  adventure: 'Adventure & Activities',
+  relaxation: 'Relaxation & Wellness',
+  nightlife: 'Nightlife & Entertainment'
+};
+
+const t = {
+  en: {
+    welcome: 'Welcome to Planora',
+    subtitle: 'Plan your perfect journey',
+    opt1: 'Continue with Gmail',
+    opt2: 'Continue with Apple ID',
+    opt3: 'Continue with Email',
+    guestBtn: 'Continue as Guest',
+    continueBtn: 'Continue',
+    signinTitle: 'Sign in with your email',
+    signinBtn: 'Sign In',
+    planTitle: 'Plan Your Trip',
+    durationLabel: 'Trip Duration',
+    timeSettingsTitle: 'Time Settings',
+    interestsLabel: 'Select Your Interests',
+    generateBtn: 'Generate Itinerary',
+    noItinerary: 'Select destination and interests to generate itinerary',
+    citation: 'Generated using AI • Each day features unique activities'
+  },
+  ar: {
+    welcome: 'مرحباً في بلانورا',
+    subtitle: 'خطط رحلتك المثالية',
+    opt1: 'المتابعة بحساب جيميل',
+    opt2: 'المتابعة بحساب آبل',
+    opt3: 'المتابعة بالبريد الإلكتروني',
+    guestBtn: 'المتابعة كضيف',
+    continueBtn: 'متابعة',
+    signinTitle: 'تسجيل الدخول بالبريد الإلكتروني',
+    signinBtn: 'تسجيل الدخول',
+    planTitle: 'خطط رحلتك',
+    durationLabel: 'مدة الرحلة',
+    timeSettingsTitle: 'إعدادات الوقت',
+    interestsLabel: 'اختر اهتماماتك',
+    generateBtn: 'إنشاء برنامج الرحلة',
+    noItinerary: 'اختر وجهة واهتماماتك لإنشاء البرنامج',
+    citation: 'تم إنشاؤه باستخدام الذكاء الاصطناعي • كل يوم به أنشطة فريدة'
+  }
+};
+
+// Enhanced database with more activities for variety
+const realPlacesDatabase = {
+  'riyadh, saudi arabia': {
+    breakfast: [
+      { id: "b1", name: "Maison de Zaid", description: "Traditional Arabic breakfast", type: "food", duration: "1.5 hours" },
+      { id: "b2", name: "Brew 92", description: "Specialty coffee in KAFD", type: "food", duration: "1 hour" },
+      { id: "b3", name: "Urth Caffé", description: "California-style breakfast", type: "food", duration: "1.5 hours" }
+    ],
+    lunch: [
+      { id: "l1", name: "IL Baretto", description: "Authentic Italian cuisine", type: "food", duration: "1.5 hours" },
+      { id: "l2", name: "Takya Riyadh", description: "Modern Saudi cuisine", type: "food", duration: "1.5 hours" },
+      { id: "l3", name: "Nobu Riyadh", description: "Japanese-Peruvian fusion", type: "food", duration: "2 hours" }
+    ],
+    dinner: [
+      { id: "d1", name: "Nozomi", description: "Japanese fine dining in KAFD", type: "food", duration: "2 hours" },
+      { id: "d2", name: "Spazio Riyadh", description: "Italian with rooftop views", type: "food", duration: "2 hours" },
+      { id: "d3", name: "The Globe", description: "Fine dining with panoramic views", type: "food", duration: "2.5 hours" }
+    ],
+    shopping: [
+      { id: "s1", name: "Riyadh Park Mall", description: "Luxury shopping mall", type: "shopping", duration: "3 hours" },
+      { id: "s2", name: "Kingdom Centre", description: "Iconic mall with Sky Bridge", type: "shopping", duration: "2.5 hours" },
+      { id: "s3", name: "Al Nakheel Mall", description: "Family shopping destination", type: "shopping", duration: "2 hours" },
+      { id: "s4", name: "Souq Al Zal", description: "Traditional market for antiques", type: "shopping", duration: "2 hours" }
+    ],
+    cultural: [
+      { id: "c1", name: "National Museum", description: "Saudi history museum", type: "cultural", duration: "2 hours" },
+      { id: "c2", name: "Diriyah Historical Center", description: "UNESCO World Heritage site", type: "cultural", duration: "3 hours" },
+      { id: "c3", name: "Al-Masmak Fortress", description: "Historic clay fortress", type: "cultural", duration: "1.5 hours" },
+      { id: "c4", name: "King Abdulaziz Historical Center", description: "Cultural complex", type: "cultural", duration: "2 hours" }
+    ],
+    adventure: [
+      { id: "a1", name: "Edge of the World", description: "Dramatic cliff hiking", type: "adventure", duration: "4 hours" },
+      { id: "a2", name: "Red Sand Dunes", description: "Desert safari experience", type: "adventure", duration: "3 hours" },
+      { id: "a3", name: "Riyadh Skydiving", description: "Indoor skydiving", type: "adventure", duration: "1.5 hours" }
+    ],
+    relaxation: [
+      { id: "r1", name: "Four Seasons Spa", description: "Luxury spa treatments", type: "relaxation", duration: "2 hours" },
+      { id: "r2", name: "Riyadh Golf Course", description: "18-hole golf course", type: "relaxation", duration: "4 hours" },
+      { id: "r3", name: "Wadi Hanifah Park", description: "Natural valley park", type: "relaxation", duration: "2 hours" }
+    ]
+  },
+  'dubai, uae': {
+    breakfast: [
+      { id: "dxb_b1", name: "Arabian Tea House", description: "Traditional Emirati breakfast", type: "food", duration: "1.5 hours" },
+      { id: "dxb_b2", name: "Tom & Serg", description: "Australian-style cafe", type: "food", duration: "1.5 hours" }
+    ],
+    lunch: [
+      { id: "dxb_l1", name: "Pierchic", description: "Overwater seafood restaurant", type: "food", duration: "2 hours" },
+      { id: "dxb_l2", name: "Al Fanar", description: "Traditional Emirati cuisine", type: "food", duration: "1.5 hours" }
+    ],
+    dinner: [
+      { id: "dxb_d1", name: "At.mosphere", description: "Restaurant in Burj Khalifa", type: "food", duration: "2.5 hours" },
+      { id: "dxb_d2", name: "Al Hadheerah", description: "Desert buffet dinner", type: "food", duration: "3 hours" }
+    ],
+    shopping: [
+      { id: "dxb_s1", name: "Dubai Mall", description: "World's largest shopping mall", type: "shopping", duration: "4 hours" },
+      { id: "dxb_s2", name: "Gold Souk", description: "Traditional gold market", type: "shopping", duration: "2 hours" }
+    ],
+    cultural: [
+      { id: "dxb_c1", name: "Dubai Museum", description: "History of Dubai", type: "cultural", duration: "2 hours" },
+      { id: "dxb_c2", name: "Jumeirah Mosque", description: "Islamic architecture", type: "cultural", duration: "1.5 hours" }
+    ]
+  }
+};
+
+// Helper Functions
+function showPage(n) {
+  document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+  const page = document.getElementById(`page${n}`);
+  if (page) page.classList.add('active');
+  state.page = n;
+  
+  // Show/hide PDF button
+  const pdfBtn = document.getElementById('pdfBtn');
+  if (n === 3 && state.currentItinerary) {
+    pdfBtn.classList.remove('hidden');
+  } else {
+    pdfBtn.classList.add('hidden');
+  }
+}
+
+function selectOption(i) {
+  document.querySelectorAll('.option').forEach((o, idx) => {
+    o.classList.toggle('selected', idx === i);
+  });
+}
+
+function continueLogin() {
+  const selectedOption = document.querySelector('.option.selected');
+  if (!selectedOption) return alert('Please select a login option');
+  const s = selectedOption.innerText;
+  if (s.includes('Email') || s.includes('البريد')) {
+    showPage(2);
+  } else {
+    state.logged = true;
+    document.getElementById('logoutBtn').classList.remove('hidden');
+    showPage(3);
+  }
+}
+
+function loginAsGuest() {
+  state.logged = true;
+  document.getElementById('logoutBtn').classList.remove('hidden');
+  showPage(3);
+}
+
+function logout() {
+  state.logged = false;
+  document.getElementById('logoutBtn').classList.add('hidden');
+  document.getElementById('pdfBtn').classList.add('hidden');
+  showPage(1);
+}
+
+function signIn() {
+  alert("Signing in with email: " + document.getElementById('emailInput').value);
+  state.logged = true;
+  document.getElementById('logoutBtn').classList.remove('hidden');
+  showPage(3);
+}
+
+function goBack() {
+  showPage(1);
+}
+
+function renderInterests() {
+  const ids = ['cultural', 'adventure', 'relaxation', 'food', 'shopping', 'nightlife'];
+  const names = {
+    en: ['Cultural', 'Adventure', 'Relaxation', 'Food', 'Shopping', 'Nightlife'],
+    ar: ['ثقافي', 'مغامرة', 'استرخاء', 'طعام', 'تسوق', 'حياة ليلية']
+  };
+  document.getElementById('interests').innerHTML = ids.map((id, i) => `
+    <div class="interest ${state.interests.includes(id) ? 'selected-interest' : ''}" onclick="toggleInterest('${id}')">
+      ${names[state.lang][i]}
+    </div>
+  `).join('');
+}
+
+function toggleInterest(id) {
+  const i = state.interests.indexOf(id);
+  if (i === -1) state.interests.push(id);
+  else state.interests.splice(i, 1);
+  renderInterests();
+}
+
+function updateDays() {
+  state.days = document.getElementById('daySlider').value;
+  document.getElementById('days').textContent = state.days;
+}
+
+function changeDays(n) {
+  let x = parseInt(state.days) + n;
+  if (x >= 1 && x <= 10) {
+    state.days = x;
+    document.getElementById('daySlider').value = x;
+    document.getElementById('days').textContent = x;
+  }
+}
+
+function updateTimeSettings() {
+  state.startTime = document.getElementById('startTime').value;
+  state.breakfastTime = document.getElementById('breakfastTime').value;
+  state.lunchTime = document.getElementById('lunchTime').value;
+  state.dinnerTime = document.getElementById('dinnerTime').value;
+}
+
+function searchDestinations() {
+  const dests = Object.keys(realPlacesDatabase).map(key => {
+    const [city, country] = key.split(', ');
+    return `${city.charAt(0).toUpperCase() + city.slice(1)}, ${country.toUpperCase()}`;
+  });
+  const v = document.getElementById('destinationInput').value.toLowerCase();
+  const searchResults = document.getElementById('searchResults');
+  if (!v) {
+    searchResults.classList.add('hidden');
+    return;
+  }
+  const filtered = dests.filter(d => d.toLowerCase().includes(v));
+  searchResults.innerHTML = filtered.map(d => `
+    <div onclick="selectDest('${d}')" style="padding:10px;background:var(--card);border-bottom:1px solid var(--border);cursor:pointer;">
+      ${d}
+    </div>
+  `).join('');
+  searchResults.classList.remove('hidden');
+}
+
+function selectDest(d) {
+  state.dest = d;
+  document.getElementById('destinationInput').value = d;
+  document.getElementById('searchResults').classList.add('hidden');
+  state.usedActivities = [];
+}
+
+function addMinutes(time, minutes) {
+  const [hours, mins] = time.split(':').map(Number);
+  let totalMinutes = hours * 60 + mins + minutes;
+  totalMinutes = totalMinutes % (24 * 60);
+  const newHours = Math.floor(totalMinutes / 60);
+  const newMins = totalMinutes % 60;
+  return `${newHours.toString().padStart(2, '0')}:${newMins.toString().padStart(2, '0')}`;
+}
+
+function formatTimeForDisplay(timeStr) {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
+// Get unique activity for each day
+function getUniqueActivity(destination, category, dayNumber, usedToday) {
+  const destKey = destination.toLowerCase();
+  
+  if (!realPlacesDatabase[destKey] || !realPlacesDatabase[destKey][category]) {
+    return getFallbackActivity(destination, category, dayNumber);
+  }
+  
+  const activities = realPlacesDatabase[destKey][category];
+  
+  // Filter out activities used today
+  const availableActivities = activities.filter(activity => 
+    !usedToday.some(used => used.id === activity.id)
+  );
+  
+  // If no unique activities left, shuffle and use any
+  const activitiesToUse = availableActivities.length > 0 ? availableActivities : 
+    [...activities].sort(() => Math.random() - 0.5);
+  
+  // Select based on day number for consistency
+  const index = (dayNumber - 1) % activitiesToUse.length;
+  const selected = activitiesToUse[index];
+  
+  usedToday.push(selected);
+  return selected;
+}
+
+function getFallbackActivity(destination, category, dayNumber) {
+  const city = destination.split(',')[0];
+  const activityNames = {
+    food: ["Local Restaurant", "Traditional Meal", "Food Market"],
+    shopping: ["Shopping District", "Local Market", "Mall Visit"],
+    cultural: ["Historical Site", "Museum Visit", "Cultural Center"],
+    adventure: ["Outdoor Activity", "City Exploration", "Adventure Tour"],
+    relaxation: ["Park Visit", "Spa Experience", "Leisure Time"]
+  };
+  
+  const options = activityNames[category] || ["City Exploration"];
+  const index = (dayNumber - 1) % options.length;
+  
+  return {
+    id: `fallback_${category}_${dayNumber}`,
+    name: `${city} ${options[index]}`,
+    description: `Enjoy ${category} in ${destination}`,
+    type: category,
+    duration: "2 hours"
+  };
+}
+
+// Generate different schedule for each day
+function generateDailySchedule(destination, dayNumber, interests) {
+  const schedule = [];
+  updateTimeSettings();
+  const usedToday = [];
+  
+  // Day themes for variety
+  const dayThemes = [
+    "Cultural Discovery Day",
+    "Food & Shopping Day", 
+    "Adventure & Relaxation Day",
+    "Local Experience Day",
+    "City Highlights Day"
+  ];
+  const theme = dayThemes[(dayNumber - 1) % dayThemes.length];
+  
+  // Breakfast - different each day
+  if (interests.includes('food')) {
+    const breakfast = getUniqueActivity(destination, 'breakfast', dayNumber, usedToday);
+    schedule.push({
+      time: formatTimeForDisplay(state.breakfastTime),
+      activity: breakfast.name,
+      description: breakfast.description,
+      type: 'food',
+      duration: breakfast.duration,
+      category: 'Breakfast',
+      unique: true
+    });
+  }
+  
+  // Morning activity - rotate through interests
+  if (interests.length > 0) {
+    const morningInterest = interests[(dayNumber - 1) % interests.length];
+    const morningActivity = getUniqueActivity(destination, morningInterest, dayNumber, usedToday);
+    schedule.push({
+      time: formatTimeForDisplay(addMinutes(state.breakfastTime, 90)),
+      activity: morningActivity.name,
+      description: morningActivity.description,
+      type: morningInterest,
+      duration: morningActivity.duration,
+      category: 'Morning Activity',
+      unique: true
+    });
+  }
+  
+  // Lunch - different each day
+  if (interests.includes('food')) {
+    const lunch = getUniqueActivity(destination, 'lunch', dayNumber, usedToday);
+    schedule.push({
+      time: formatTimeForDisplay(state.lunchTime),
+      activity: lunch.name,
+      description: lunch.description,
+      type: 'food',
+      duration: lunch.duration,
+      category: 'Lunch',
+      unique: true
+    });
+  }
+  
+  // Afternoon activity - different from morning
+  if (interests.length > 1) {
+    const afternoonInterest = interests[(dayNumber) % interests.length];
+    const afternoonActivity = getUniqueActivity(destination, afternoonInterest, dayNumber + 1, usedToday);
+    schedule.push({
+      time: formatTimeForDisplay(addMinutes(state.lunchTime, 90)),
+      activity: afternoonActivity.name,
+      description: afternoonActivity.description,
+      type: afternoonInterest,
+      duration: afternoonActivity.duration,
+      category: 'Afternoon Activity',
+      unique: true
+    });
+  }
+  
+  // Special activity unique to each day
+  const specialActivities = [
+    { name: "Sunset Viewing", type: "relaxation", duration: "1 hour", desc: "Watch the sunset at scenic spot" },
+    { name: "Local Market Visit", type: "shopping", duration: "1.5 hours", desc: "Explore traditional markets" },
+    { name: "Evening Walk Tour", type: "adventure", duration: "1 hour", desc: "Guided walking tour of the city" },
+    { name: "Cultural Performance", type: "cultural", duration: "2 hours", desc: "Traditional music or dance show" }
+  ];
+  const specialIndex = (dayNumber - 1) % specialActivities.length;
+  const special = specialActivities[specialIndex];
+  
+  schedule.push({
+    time: formatTimeForDisplay(addMinutes(state.lunchTime, 210)), // 3.5 hours after lunch
+    activity: special.name,
+    description: special.desc,
+    type: special.type,
+    duration: special.duration,
+    category: 'Special Experience',
+    unique: true
+  });
+  
+  // Dinner - different each day
+  if (interests.includes('food')) {
+    const dinner = getUniqueActivity(destination, 'dinner', dayNumber, usedToday);
+    schedule.push({
+      time: formatTimeForDisplay(state.dinnerTime),
+      activity: dinner.name,
+      description: dinner.description,
+      type: 'food',
+      duration: dinner.duration,
+      category: 'Dinner',
+      unique: true
+    });
+  }
+  
+  return {
+    theme: theme,
+    schedule: schedule
+  };
+}
+
+async function generateItinerary() {
+  const dest = state.dest;
+  const days = parseInt(state.days);
+  const interests = state.interests;
+
+  if (interests.length === 0) {
+    alert("Please select at least one interest!");
+    return;
+  }
+
+  const generateBtn = document.getElementById('generateBtn');
+  const originalText = generateBtn.textContent;
+  generateBtn.textContent = 'Generating...';
+  generateBtn.disabled = true;
+
+  try {
+    state.usedActivities = [];
+    updateTimeSettings();
+    
+    // Generate each day with unique activities
+    const itineraryDays = [];
+    for (let dayNum = 1; dayNum <= days; dayNum++) {
+      const dailySchedule = generateDailySchedule(dest, dayNum, interests);
+      itineraryDays.push({
+        number: dayNum,
+        theme: dailySchedule.theme,
+        schedule: dailySchedule.schedule
+      });
+    }
+
+    state.currentItinerary = {
+      destination: dest,
+      duration: days,
+      startTime: state.startTime,
+      breakfastTime: state.breakfastTime,
+      lunchTime: state.lunchTime,
+      dinnerTime: state.dinnerTime,
+      interests: interests,
+      days: itineraryDays
+    };
+
+    renderItinerary();
+    
+    // Show PDF button
+    document.getElementById('pdfBtn').classList.remove('hidden');
+    
+  } catch (error) {
+    console.error("Error:", error);
+    alert("An error occurred. Please try again.");
+  } finally {
+    generateBtn.textContent = originalText;
+    generateBtn.disabled = false;
+  }
+}
+
+function renderItinerary() {
+  const it = state.currentItinerary;
+  if (!it || !it.days.length) {
+    document.getElementById('itinerary').innerHTML = `<p id="noItinerary">${t[state.lang].noItinerary}</p>`;
+    return;
+  }
+
+  const dest = it.destination.split(',')[0];
+  let daysHTML = '';
+  
+  it.days.forEach(day => {
+    let timeSlotsHTML = '';
+    
+    day.schedule.forEach((slot) => {
+      const isMeal = slot.category.includes('Breakfast') || slot.category.includes('Lunch') || slot.category.includes('Dinner');
+      const isSpecial = slot.category.includes('Special');
+      const borderColor = isMeal ? '#ef4444' : isSpecial ? '#8b5cf6' : '#4f46e5';
+      
+      timeSlotsHTML += `
+        <div class="time-slot" style="border-left-color: ${borderColor};">
+          <div class="time-label">${slot.time}</div>
+          <div class="activity-details">
+            <div class="activity-type">
+              ${slot.category} • ${activityTypes[slot.type] || slot.type} • ${slot.duration}
+              ${slot.unique ? '<span style="color:#10b981; margin-left:10px;">★ Unique</span>' : ''}
+            </div>
+            <div class="activity-name">${slot.activity}</div>
+            <div style="font-size: 0.9em; color: #4b5563; margin-top: 5px;">${slot.description}</div>
+          </div>
+        </div>
+      `;
+    });
+
+    daysHTML += `
+      <div style="background:var(--bg);padding:20px;border-radius:12px;margin:20px 0;border:2px solid var(--border);">
+        <div style="color:var(--primary);font-weight:bold;font-size:1.3em;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+          <span style="background:var(--primary);color:white;padding:8px 20px;border-radius:20px;font-size:1.1em;">Day ${day.number}</span>
+          <span style="font-size:1.2em;">${day.theme}</span>
+        </div>
+        <div style="margin-top:15px;">
+          ${timeSlotsHTML}
+        </div>
+      </div>
+    `;
+  });
+
+  document.getElementById('itinerary').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div>
+        <h3 style="color:var(--primary);">📍 ${it.destination}</h3>
+        <div style="display:flex;gap:10px;margin-top:5px;flex-wrap:wrap;">
+          <div style="background:var(--primary);color:white;padding:5px 12px;border-radius:15px;">${it.duration} days</div>
+          ${it.interests.map(x => `<div style="background:var(--card);padding:5px 12px;border-radius:15px;border:1px solid var(--border);">${activityTypes[x]}</div>`).join('')}
+        </div>
+      </div>
+    </div>
+    
+    <div style="background:linear-gradient(90deg, #4f46e5, #8b5cf6);color:white;padding:15px;border-radius:10px;margin-bottom:20px;text-align:center;">
+      <strong>✨ Each Day is Different!</strong> Your itinerary features unique activities every day.
+    </div>
+    
+    ${daysHTML}
+    
+    <p style="text-align:center;margin-top:20px;font-size:0.9em;color:gray;">
+      * ${t[state.lang].citation}
+    </p>
+  `;
+}
+
+// PDF Export Function
+async function exportToPDF() {
+  if (!state.currentItinerary) {
+    alert("Please generate an itinerary first!");
+    return;
+  }
+
+  const pdfBtn = document.getElementById('pdfBtn');
+  const originalText = pdfBtn.textContent;
+  pdfBtn.textContent = 'Creating PDF...';
+  pdfBtn.disabled = true;
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    
+    // Title
+    doc.setFontSize(22);
+    doc.setTextColor(79, 70, 229);
+    doc.text('Planora Travel Itinerary', 105, 20, { align: 'center' });
+    
+    // Destination info
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Destination: ${state.currentItinerary.destination}`, 20, 35);
+    doc.text(`Duration: ${state.currentItinerary.duration} days`, 20, 42);
+    doc.text(`Interests: ${state.currentItinerary.interests.map(i => activityTypes[i]).join(', ')}`, 20, 49);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 56);
+    
+    let yPos = 70;
+    
+    // Add each day
+    state.currentItinerary.days.forEach(day => {
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      // Day header
+      doc.setFontSize(16);
+      doc.setTextColor(79, 70, 229);
+      doc.text(`Day ${day.number}: ${day.theme}`, 20, yPos);
+      yPos += 10;
+      
+      // Activities
+      doc.setFontSize(10);
+      day.schedule.forEach((slot, slotIndex) => {
+        if (yPos > 270) {
+          doc.addPage();
+          yPos = 20;
+        }
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${slot.time} ${slot.category}:`, 25, yPos);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.text(slot.activity, 70, yPos);
+        yPos += 5;
+        
+        doc.setFontSize(9);
+        doc.text(`   ${slot.description}`, 30, yPos);
+        yPos += 4;
+        doc.text(`   Type: ${activityTypes[slot.type] || slot.type} • Duration: ${slot.duration}`, 30, yPos);
+        yPos += 7;
+      });
+      
+      yPos += 10;
+    });
+    
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text('Generated by Planora • Each day features unique activities', 105, 285, { align: 'center' });
+    
+    // Save
+    const filename = `Planora_${state.currentItinerary.destination.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.pdf`;
+    doc.save(filename);
+    
+    alert("PDF exported successfully!");
+  } catch (error) {
+    console.error("PDF Error:", error);
+    alert("Error creating PDF. Please try again.");
+  } finally {
+    pdfBtn.textContent = originalText;
+    pdfBtn.disabled = false;
+  }
+}
+
+function toggleTheme() {
+  state.dark = !state.dark;
+  if (state.dark) {
+    document.body.classList.add('dark');
+    document.getElementById('themeBtn').textContent = '☀️';
+  } else {
+    document.body.classList.remove('dark');
+    document.getElementById('themeBtn').textContent = '🌙';
+  }
+}
+
+function toggleLang() {
+  state.lang = state.lang === 'en' ? 'ar' : 'en';
+  applyTranslations();
+  renderInterests();
+}
+
+function applyTranslations() {
+  const lang = state.lang;
+  document.getElementById('welcome').textContent = t[lang].welcome;
+  document.getElementById('subtitle').textContent = t[lang].subtitle;
+  document.getElementById('opt1').textContent = t[lang].opt1;
+  document.getElementById('opt2').textContent = t[lang].opt2;
+  document.getElementById('opt3').textContent = t[lang].opt3;
+  document.getElementById('guestBtn').textContent = t[lang].guestBtn;
+  document.getElementById('continueBtn').textContent = t[lang].continueBtn;
+  document.getElementById('signinTitle').textContent = t[lang].signinTitle;
+  document.getElementById('signinBtn').textContent = t[lang].signinBtn;
+  document.getElementById('planTitle').textContent = t[lang].planTitle;
+  document.getElementById('durationLabel').textContent = t[lang].durationLabel;
+  document.getElementById('timeSettingsTitle').textContent = t[lang].timeSettingsTitle;
+  document.getElementById('interestsLabel').textContent = t[lang].interestsLabel;
+  document.getElementById('generateBtn').textContent = t[lang].generateBtn;
+  document.getElementById('noItinerary').textContent = t[lang].noItinerary;
+
+  if (lang === 'ar') document.body.classList.add('lang-ar');
+  else document.body.classList.remove('lang-ar');
+}
+
+function init() {
+  applyTranslations();
+  renderInterests();
+  updateDays();
+  showPage(1);
+}
+
+init();
+</script>
+
+</body>
+</html>
